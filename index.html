@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>習慣管理ツール</title>
+    <!-- Chart.js ライブラリ -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-color: #1e293b;
+            --border-color: #e2e8f0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 12px;
+            padding-bottom: 75px; /* ボトムナビの分空ける */
+            -webkit-text-size-adjust: 100%;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        h1 {
+            font-size: 1.3rem;
+            text-align: center;
+            margin-bottom: 12px;
+            color: var(--primary);
+        }
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        h2 {
+            font-size: 1.1rem;
+            margin-top: 0;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 6px;
+            margin-bottom: 12px;
+        }
+        label {
+            display: block;
+            font-size: 0.9rem;
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+        select, input[type="text"], input[type="date"], textarea {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+        textarea { resize: vertical; height: 60px; }
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px;
+            width: 100%;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        button:active { opacity: 0.8; }
+        
+        /* ページ切り替え用スタイル */
+        .page { display: none; }
+        .page.active { display: block; }
+
+        /* ボトムナビゲーション（4タブ） */
+        .nav-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: #ffffff;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-around;
+            padding: 8px 0;
+            box-shadow: 0 -2px 5px rgba(0,0,0,0.05);
+            z-index: 1000;
+        }
+        .nav-item {
+            background: none;
+            border: none;
+            color: #64748b;
+            font-size: 0.7rem;
+            font-weight: bold;
+            padding: 4px;
+            width: auto;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .nav-item.active {
+            color: var(--primary);
+        }
+
+        /* 大項目フィルターボタン群 */
+        .filter-tabs {
+            display: flex;
+            gap: 4px;
+            overflow-x: auto;
+            margin-bottom: 12px;
+            padding-bottom: 4px;
+        }
+        .filter-tab {
+            background: #f1f5f9;
+            border: 1px solid var(--border-color);
+            padding: 6px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            cursor: pointer;
+            color: #475569;
+        }
+        .filter-tab.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+            font-weight: bold;
+        }
+
+        .project-item {
+            background: #f1f5f9;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+        .radio-group {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 4px;
+            margin-bottom: 8px;
+            font-size: 0.75rem;
+        }
+        .radio-group label {
+            background: #fff;
+            border: 1px solid var(--border-color);
+            padding: 6px 2px;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: center;
+            margin-bottom: 0;
+        }
+        .radio-group input { display: none; }
+        .radio-group input:checked + span {
+            font-weight: bold;
+            color: var(--primary);
+        }
+        .radio-group label:has(input:checked) {
+            border-color: var(--primary);
+            background: #e0e7ff;
+        }
+        table {
+            width: 100%;
+            font-size: 0.75rem;
+            border-collapse: collapse;
+            margin-top: 8px;
+        }
+        th, td {
+            border: 1px solid var(--border-color);
+            padding: 6px 4px;
+            text-align: center;
+            vertical-align: middle;
+        }
+        th { background: #f8fafc; }
+        .stats-box {
+            background: #f1f5f9;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            font-size: 0.9rem;
+        }
+        .ranking-item {
+            background: #f8fafc;
+            border: 1px solid var(--border-color);
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+        }
+        .badge {
+            font-size: 0.65rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .badge-active { background: #d1fae5; color: #065f46; }
+        .badge-hold { background: #fef3c7; color: #92400e; }
+        .badge-closed { background: #f1f5f9; color: #475569; }
+        .btn-secondary {
+            background: #64748b;
+            margin-top: 6px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>習慣管理ツール</h1>
+
+    <!-- ページ①：習慣プロジェクト設定 -->
+    <div id="page-settings" class="page">
+        <div class="card">
+            <h2 id="form-heading">習慣プロジェクト設定（新規追加）</h2>
+            <form id="project-form">
+                <input type="hidden" id="p-edit-id" value="">
+                <label>大項目</label>
+                <select id="p-category">
+                    <option value="睡眠">睡眠</option>
+                    <option value="フィジカル">フィジカル</option>
+                    <option value="メンタル">メンタル</option>
+                    <option value="知識">知識</option>
+                    <option value="営業">営業</option>
+                    <option value="その他">その他</option>
+                </select>
+                <label>プロジェクト名</label>
+                <input type="text" id="p-title" placeholder="例：早起き 7時" required>
+                <label>プロジェクト内容（詳細）</label>
+                <textarea id="p-desc" placeholder="例：毎日7時に起きて白湯を飲む"></textarea>
+                <label>状態区分</label>
+                <select id="p-status">
+                    <option value="active">実施中</option>
+                    <option value="hold">保留</option>
+                    <option value="closed">終了</option>
+                </select>
+                <button type="submit" id="form-submit-btn">プロジェクトを追加</button>
+                <button type="button" id="form-cancel-btn" class="btn-secondary" style="display:none;" onclick="resetProjectForm()">編集をキャンセル</button>
+            </form>
+            <div id="project-list-manage" style="margin-top: 16px;"></div>
+        </div>
+    </div>
+
+    <!-- ページ②：日次画面（初期表示） -->
+    <div id="page-daily" class="page active">
+        <div class="card">
+            <h2>日次記録・編集</h2>
+            <label>日付選択（過去の日付を選ぶと過去分の編集ができます）</label>
+            <input type="date" id="log-date">
+
+            <!-- 大項目フィルタータブ -->
+            <label style="margin-top: 12px;">表示フィルター</label>
+            <div class="filter-tabs" id="filter-tabs-container">
+                <button type="button" class="filter-tab active" onclick="setCategoryFilter('all')">すべて表示</button>
+                <button type="button" class="filter-tab" onclick="setCategoryFilter('睡眠')">睡眠</button>
+                <button type="button" class="filter-tab" onclick="setCategoryFilter('フィジカル')">フィジカル</button>
+                <button type="button" class="filter-tab" onclick="setCategoryFilter('メンタル')">メンタル</button>
+                <button type="button" class="filter-tab" onclick="setCategoryFilter('知識')">知識</button>
+                <button type="button" class="filter-tab" onclick="setCategoryFilter('営業')">営業</button>
+                <button type="button" class="filter-tab" onclick="setCategoryFilter('その他')">その他</button>
+            </div>
+
+            <div id="daily-input-area" style="margin-top: 12px;">
+                <!-- 実施中のプロジェクトがここに動的生成されます -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ページ③：ダッシュボード -->
+    <div id="page-dashboard" class="page">
+        <div class="card">
+            <h2>ダッシュボード</h2>
+            <p style="font-size:0.8rem; color:#666; margin-top:0;">※各プロジェクト設定で「除外✔」されたものは集計から除外されています。</p>
+            <div id="dashboard-summary" style="margin-top: 12px;">
+                <!-- 大項目別のトータルポイント -->
+            </div>
+
+            <h3 style="font-size: 1rem; margin-top: 24px; border-bottom: 2px solid var(--border-color); padding-bottom: 6px;">継続日数ランキング</h3>
+            <div style="margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" id="ranking-include-inactive" onchange="updateDashboard()" style="width: 16px; height: 16px; cursor: pointer;">
+                <label for="ranking-include-inactive" style="font-size: 0.85rem; margin-bottom: 0; cursor: pointer;">終了・保留のプロジェクトも含めて表示する</label>
+            </div>
+            <div id="dashboard-ranking" style="margin-top: 8px;">
+                <!-- 継続日数ランキングがここに動的生成されます -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ページ④：グラフ -->
+    <div id="page-graphs" class="page">
+        <div class="card">
+            <h2>グラフ</h2>
+            <p style="font-size:0.8rem; color:#666; margin-top:0;">※各プロジェクト設定で「除外✔」されたものはグラフから除外されています。</p>
+            
+            <h3 style="font-size: 1rem; margin-top: 16px;">大項目のポイント状態（レーダー）</h3>
+            <canvas id="radarChart"></canvas>
+
+            <h3 style="font-size: 1rem; margin-top: 24px;">大項目別・日別ポイント推移（1か月表示）</h3>
+            <label style="margin-top: 8px;">表示する月を選択</label>
+            <input type="month" id="graph-month-select" onchange="updateGraphs()">
+            
+            <div style="margin-top: 12px;">
+                <canvas id="lineChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- スマホ下部ナビゲーションバー -->
+<div class="nav-bar">
+    <button class="nav-item" onclick="switchPage('settings', this)" id="nav-btn-settings">
+        <span>⚙️ 設定</span>
+    </button>
+    <button class="nav-item active" onclick="switchPage('daily', this)" id="nav-btn-daily">
+        <span>📝 日次</span>
+    </button>
+    <button class="nav-item" onclick="switchPage('dashboard', this)" id="nav-btn-dashboard">
+        <span>📋 ダッシュボード</span>
+    </button>
+    <button class="nav-item" onclick="switchPage('graphs', this)" id="nav-btn-graphs">
+        <span>📊 グラフ</span>
+    </button>
+</div>
+
+<script>
+    const CATEGORIES = ["睡眠", "フィジカル", "メンタル", "知識", "営業", "その他"];
+    
+    let projects = JSON.parse(localStorage.getItem('habit_projects')) || [];
+    let dailyLogs = JSON.parse(localStorage.getItem('habit_logs')) || {};
+    let currentCategoryFilter = 'all';
+
+    // 日付の初期値を本日に設定
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    document.getElementById('log-date').value = todayStr;
+    document.getElementById('log-date').addEventListener('change', loadDailyInputs);
+
+    // グラフ用月選択の初期値を今月に設定 (YYYY-MM形式)
+    const currentYearMonth = today.toISOString().slice(0, 7);
+    document.getElementById('graph-month-select').value = currentYearMonth;
+
+    let radarChartInstance = null;
+    let lineChartInstance = null;
+
+    // --- ページ切り替え関数 ---
+    function switchPage(pageName, btnElement) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+
+        if(pageName === 'settings') {
+            document.getElementById('page-settings').classList.add('active');
+        } else if(pageName === 'daily') {
+            document.getElementById('page-daily').classList.add('active');
+            loadDailyInputs();
+        } else if(pageName === 'dashboard') {
+            document.getElementById('page-dashboard').classList.add('active');
+            updateDashboard();
+        } else if(pageName === 'graphs') {
+            document.getElementById('page-graphs').classList.add('active');
+            updateGraphs();
+        }
+        btnElement.classList.add('active');
+    }
+
+    // --- 日次画面のカテゴリーフィルター切り替え ---
+    function setCategoryFilter(category) {
+        currentCategoryFilter = category;
+        const buttons = document.querySelectorAll('#filter-tabs-container .filter-tab');
+        buttons.forEach(btn => {
+            if(btn.textContent.includes(category) || (category === 'all' && btn.textContent === 'すべて表示')) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+        loadDailyInputs();
+    }
+
+    // --- 継続日数の計算ロジック ---
+    // 作成日(createdAt)から今日までの日数（または記録が存在する期間）を計算する
+    function calculateStreakDays(project) {
+        const createdDateStr = project.createdAt || todayStr;
+        const createdDate = new Date(createdDateStr);
+        const now = new Date(todayStr);
+        
+        // 経過日数を計算（最低1日）
+        const diffTime = now - createdDate;
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        return diffDays > 0 ? diffDays : 1;
+    }
+
+    // --- プロジェクト登録・編集フォーム処理 ---
+    document.getElementById('project-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const title = document.getElementById('p-title').value.trim();
+        if(!title) return;
+
+        const editId = document.getElementById('p-edit-id').value;
+
+        if(editId) {
+            const p = projects.find(item => item.id === editId);
+            if(p) {
+                p.category = document.getElementById('p-category').value;
+                p.title = title;
+                p.desc = document.getElementById('p-desc').value.trim();
+                p.status = document.getElementById('p-status').value;
+            }
+        } else {
+            const newProject = {
+                id: 'proj_' + Date.now(),
+                category: document.getElementById('p-category').value,
+                title: title,
+                desc: document.getElementById('p-desc').value.trim(),
+                status: document.getElementById('p-status').value,
+                exclude: false,
+                createdAt: todayStr // 作成日を保存
+            };
+            projects.push(newProject);
+        }
+
+        saveAndRefresh();
+        resetProjectForm();
+    });
+
+    function editProject(id) {
+        const p = projects.find(item => item.id === id);
+        if(!p) return;
+
+        document.getElementById('p-edit-id').value = p.id;
+        document.getElementById('p-category').value = p.category;
+        document.getElementById('p-title').value = p.title;
+        document.getElementById('p-desc').value = p.desc;
+        document.getElementById('p-status').value = p.status;
+
+        document.getElementById('form-heading').textContent = '習慣プロジェクト設定（編集モード）';
+        document.getElementById('form-submit-btn').textContent = 'プロジェクトを更新する';
+        document.getElementById('form-cancel-btn').style.display = 'block';
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function resetProjectForm() {
+        document.getElementById('p-edit-id').value = '';
+        document.getElementById('p-category').value = '睡眠';
+        document.getElementById('p-title').value = '';
+        document.getElementById('p-desc').value = '';
+        document.getElementById('p-status').value = 'active';
+
+        document.getElementById('form-heading').textContent = '習慣プロジェクト設定（新規追加）';
+        document.getElementById('form-submit-btn').textContent = 'プロジェクトを追加';
+        document.getElementById('form-cancel-btn').style.display = 'none';
+    }
+
+    function updateProjectStatus(id, newStatus) {
+        const p = projects.find(item => item.id === id);
+        if(p) {
+            p.status = newStatus;
+            saveAndRefresh();
+        }
+    }
+
+    function updateProjectExclude(id, isChecked) {
+        const p = projects.find(item => item.id === id);
+        if(p) {
+            p.exclude = isChecked;
+            saveAndRefresh();
+        }
+    }
+
+    function deleteProject(id) {
+        if(confirm('このプロジェクトを削除しますか？')) {
+            projects = projects.filter(item => item.id !== id);
+            saveAndRefresh();
+            resetProjectForm();
+        }
+    }
+
+    function saveAndRefresh() {
+        // 既存データにcreatedAtがない場合の補正
+        projects.forEach(p => {
+            if(!p.createdAt) p.createdAt = todayStr;
+        });
+        localStorage.setItem('habit_projects', JSON.stringify(projects));
+        renderManageList();
+        loadDailyInputs();
+    }
+
+    // --- 管理リストの描画（継続日数追加） ---
+    function renderManageList() {
+        const container = document.getElementById('project-list-manage');
+        if(projects.length === 0) {
+            container.innerHTML = '<p style="font-size:0.85rem; color:#666; text-align:center;">プロジェクトが登録されていません</p>';
+            return;
+        }
+        let html = '<table><tr><th>大項目</th><th>名前 / 継続</th><th>状態</th><th>除外✔</th><th>操作</th></tr>';
+        projects.forEach(p => {
+            if(!p.createdAt) p.createdAt = todayStr;
+            const streak = calculateStreakDays(p);
+            
+            html += `<tr>
+                <td style="text-align:left;">${p.category}</td>
+                <td style="text-align:left;"><b>${p.title}</b><br><span style="font-size:0.75rem; color:#4f46e5; font-weight:bold;">🔥 継続: ${streak}日</span></td>
+                <td>
+                    <select onchange="updateProjectStatus('${p.id}', this.value)" style="padding:2px; font-size:0.7rem; margin:0; width:auto;">
+                        <option value="active" ${p.status==='active'?'selected':''}>実施中</option>
+                        <option value="hold" ${p.status==='hold'?'selected':''}>保留</option>
+                        <option value="closed" ${p.status==='closed'?'selected':''}>終了</option>
+                    </select>
+                </td>
+                <td>
+                    <input type="checkbox" title="集計から除外" ${p.exclude ? 'checked' : ''} onchange="updateProjectExclude('${p.id}', this.checked)" style="width:16px; height:16px; cursor:pointer;">
+                </td>
+                <td>
+                    <button onclick="editProject('${p.id}')" style="background:#0284c7; padding:4px 6px; font-size:0.7rem; width:auto; margin-bottom:2px;">編集</button>
+                    <button onclick="deleteProject('${p.id}')" style="background:#ef4444; padding:4px 6px; font-size:0.7rem; width:auto;">削除</button>
+                </td>
+            </tr>`;
+        });
+        html += '</table>';
+        container.innerHTML = html;
+    }
+
+    // --- 日次画面の描画（実施中のプロジェクトのみ） ---
+    function loadDailyInputs() {
+        const dateVal = document.getElementById('log-date').value;
+        let activeProjects = projects.filter(p => p.status === 'active');
+
+        if(currentCategoryFilter !== 'all') {
+            activeProjects = activeProjects.filter(p => p.category === currentCategoryFilter);
+        }
+
+        const container = document.getElementById('daily-input-area');
+
+        if(activeProjects.length === 0) {
+            container.innerHTML = '<p style="font-size:0.85rem; color:#666; text-align:center;">該当する「実施中」のプロジェクトはありません。<br>「⚙️ 設定」画面から追加するか、フィルターを切り替えてください。</p>';
+            return;
+        }
+
+        const savedData = (dailyLogs[dateVal] || {});
+
+        let html = '';
+        activeProjects.forEach(p => {
+            const hasData = savedData[p.id] !== undefined;
+            const current = savedData[p.id] || { type: 'none', memo: '' };
+            
+            const statusLabel = hasData ? '' : '<span style="color: #ef4444; font-weight: bold; font-size: 0.8rem; margin-left: 6px;">（未登録）</span>';
+            const btnColor = hasData ? '#059669' : '#f97316';
+            const btnText = hasData ? 'この項目を更新する' : 'この項目を新規登録する';
+
+            html += `<div class="project-item" data-id="${p.id}">
+                <div style="font-weight:bold; font-size:0.9rem;">[${p.category}] ${p.title} ${statusLabel}</div>
+                ${p.desc ? `<div style="font-size:0.8rem; color:#555; margin-bottom:6px;">${p.desc}</div>` : ''}
+                <div class="radio-group">
+                    <label><input type="radio" name="type_${p.id}" value="standard" ${current.type==='standard'?'checked':''}><span>標準<br>(+1P)</span></label>
+                    <label><input type="radio" name="type_${p.id}" value="intensive" ${current.type==='intensive'?'checked':''}><span>強化<br>(+2P)</span></label>
+                    <label><input type="radio" name="type_${p.id}" value="cooldown" ${current.type==='cooldown'?'checked':''}><span>クール<br>(+0.5P)</span></label>
+                    <label><input type="radio" name="type_${p.id}" value="none" ${current.type==='none'||!current.type?'checked':''}><span>未実施<br>(-1P)</span></label>
+                    <label><input type="radio" name="type_${p.id}" value="other" ${current.type==='other'?'checked':''}><span>その他<br>(0P)</span></label>
+                </div>
+                <input type="text" id="memo_${p.id}" placeholder="メモ（任意）" value="${current.memo || ''}" style="margin-bottom:8px; font-size:0.9rem;">
+                <button type="button" onclick="saveSingleProjectLog('${p.id}')" style="background:${btnColor}; padding:6px; font-size:0.85rem;">${btnText}</button>
+            </div>`;
+        });
+        container.innerHTML = html;
+    }
+
+    // --- プロジェクト単位での日次記録保存 ---
+    function saveSingleProjectLog(pId) {
+        const dateVal = document.getElementById('log-date').value;
+        if(!dailyLogs[dateVal]) dailyLogs[dateVal] = {};
+
+        const radioEl = document.querySelector(`input[name="type_${pId}"]:checked`);
+        const memoEl = document.getElementById(`memo_${pId}`);
+
+        if(radioEl && memoEl) {
+            dailyLogs[dateVal][pId] = {
+                type: radioEl.value,
+                memo: memoEl.value
+            };
+            localStorage.setItem('habit_logs', JSON.stringify(dailyLogs));
+            alert('保存しました！');
+            loadDailyInputs();
+        }
+    }
+
+    // --- ポイント算出ロジック ---
+    function getPoint(type) {
+        if(type === 'standard') return 1.0;
+        if(type === 'intensive') return 2.0;
+        if(type === 'cooldown') return 0.5;
+        if(type === 'none') return -1.0;
+        if(type === 'other') return 0.0;
+        return 0;
+    }
+
+    function getValidProjectIds() {
+        const validIds = new Set();
+        projects.forEach(p => {
+            if(!p.exclude) {
+                validIds.add(p.id);
+            }
+        });
+        return validIds;
+    }
+
+    // --- ダッシュボード更新（ポイント＋継続日数ランキング） ---
+    function updateDashboard() {
+        const validProjectIds = getValidProjectIds();
+        let catPoints = { "睡眠": 0, "フィジカル": 0, "メンタル": 0, "知識": 0, "営業": 0, "その他": 0 };
+        
+        for(let date in dailyLogs) {
+            for(let pId in dailyLogs[date]) {
+                if(validProjectIds.has(pId)) {
+                    const proj = projects.find(item => item.id === pId);
+                    if(proj) {
+                        const log = dailyLogs[date][pId];
+                        catPoints[proj.category] += getPoint(log.type);
+                    }
+                }
+            }
+        }
+
+        // ポイントサマリー描画
+        let html = '';
+        CATEGORIES.forEach(cat => {
+            html += `<div class="stats-box">
+                <b>📁 ${cat}</b>： <span style="font-size:1.1rem; color:var(--primary); font-weight:bold;">${catPoints[cat]} ポイント</span>
+            </div>`;
+        });
+        document.getElementById('dashboard-summary').innerHTML = html;
+
+        // 継続日数ランキングの描画
+        const includeInactive = document.getElementById('ranking-include-inactive').checked;
+        let targetProjects = projects.map(p => ({
+            ...p,
+            streak: calculateStreakDays(p)
+        }));
+
+        // チェックが入っていない場合は active のみ抽出
+        if(!includeInactive) {
+            targetProjects = targetProjects.filter(p => p.status === 'active');
+        }
+
+        // 継続日数が多い順にソート
+        targetProjects.sort((a, b) => b.streak - a.streak);
+
+        const rankingContainer = document.getElementById('dashboard-ranking');
+        if(targetProjects.length === 0) {
+            rankingContainer.innerHTML = '<p style="font-size:0.85rem; color:#666; text-align:center;">表示できるプロジェクトがありません</p>';
+            return;
+        }
+
+        let rankHtml = '';
+        targetProjects.forEach((p, index) => {
+            let badgeClass = 'badge-active';
+            let badgeText = '実施中';
+            if(p.status === 'hold') {
+                badgeClass = 'badge-hold';
+                badgeText = '保留';
+            } else if(p.status === 'closed') {
+                badgeClass = 'badge-closed';
+                badgeText = '終了';
+            }
+
+            rankHtml += `<div class="ranking-item">
+                <div>
+                    <span style="font-weight:bold; margin-right:6px; color:#4f46e5;">#${index + 1}</span>
+                    <span class="badge ${badgeClass}">${badgeText}</span>
+                    <b>[${p.category}] ${p.title}</b>
+                </div>
+                <div style="font-weight:bold; color:#d97706; font-size:0.95rem;">
+                    🔥 ${p.streak} 日
+                </div>
+            </div>`;
+        });
+        rankingContainer.innerHTML = rankHtml;
+    }
+
+    // --- グラフ更新 ---
+    function updateGraphs() {
+        const validProjectIds = getValidProjectIds();
+        let catPoints = { "睡眠": 0, "フィジカル": 0, "メンタル": 0, "知識": 0, "営業": 0, "その他": 0 };
+        
+        for(let date in dailyLogs) {
+            for(let pId in dailyLogs[date]) {
+                if(validProjectIds.has(pId)) {
+                    const proj = projects.find(item => item.id === pId);
+                    if(proj) {
+                        const log = dailyLogs[date][pId];
+                        catPoints[proj.category] += getPoint(log.type);
+                    }
+                }
+            }
+        }
+
+        const radarData = CATEGORIES.map(cat => catPoints[cat]);
+
+        const ctxRadar = document.getElementById('radarChart').getContext('2d');
+        if(radarChartInstance) radarChartInstance.destroy();
+        radarChartInstance = new Chart(ctxRadar, {
+            type: 'radar',
+            data: {
+                labels: CATEGORIES,
+                datasets: [{
+                    label: '大項目別 累積ポイント',
+                    data: radarData,
+                    backgroundColor: 'rgba(79, 70, 229, 0.2)',
+                    borderColor: 'rgba(79, 70, 229, 1)',
+                    borderWidth: 2
+                }]
+            },
+            options: { scales: { r: { beginAtZero: true } } }
+        });
+
+        // 選択された年月（例: "2026-09"）から、その月の日付一覧（1日〜末日）を自動生成
+        const selectedMonthStr = document.getElementById('graph-month-select').value; // "YYYY-MM"
+        const [year, month] = selectedMonthStr.split('-').map(Number);
+        
+        const daysInMonth = new Date(year, month, 0).getDate(); // その月の総日数
+        let lineLabels = [];
+        let dateStrings = [];
+
+        for(let day = 1; day <= daysInMonth; day++) {
+            const mm = String(month).padStart(2, '0');
+            const dd = String(day).padStart(2, '0');
+            const dateStr = `${year}-${mm}-${dd}`;
+            dateStrings.push(dateStr);
+            lineLabels.push(`${month}/${day}`);
+        }
+
+        // 6色それぞれのカラー定義
+        const categoryColors = {
+            "睡眠": "#4f46e5",     // インディゴ
+            "フィジカル": "#10b981", // グリーン
+            "メンタル": "#f59e0b",   // オレンジ
+            "知識": "#0284c7",     // ブルー
+            "営業": "#ec4899",     // ピンク
+            "その他": "#64748b"    // グレー
+        };
+
+        // 大項目ごとに日別の合計ポイントを算出するデータセットを作成
+        const lineDatasets = CATEGORIES.map(cat => {
+            const dataPerDay = dateStrings.map(dateStr => {
+                let daySum = 0;
+                const dayLog = dailyLogs[dateStr] || {};
+                for(let pId in dayLog) {
+                    if(validProjectIds.has(pId)) {
+                        const proj = projects.find(item => item.id === pId);
+                        if(proj && proj.category === cat) {
+                            daySum += getPoint(dayLog[pId].type);
+                        }
+                    }
+                }
+                return daySum;
+            });
+
+            return {
+                label: cat,
+                data: dataPerDay,
+                borderColor: categoryColors[cat],
+                backgroundColor: categoryColors[cat],
+                tension: 0.1,
+                fill: false,
+                borderWidth: 2
+            };
+        });
+
+        const ctxLine = document.getElementById('lineChart').getContext('2d');
+        if(lineChartInstance) lineChartInstance.destroy();
+        lineChartInstance = new Chart(ctxLine, {
+            type: 'line',
+            data: {
+                labels: lineLabels,
+                datasets: lineDatasets
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: { beginAtZero: true }
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+
+    // 初期ロード時：本日の日次入力を描画
+    saveAndRefresh();
+    loadDailyInputs();
+</script>
+
+</body>
+</html>
